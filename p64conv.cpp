@@ -29,9 +29,13 @@ int txt2p64(string infile, string outfile)
    fstream in(infile.c_str());
    string  line;
    int     track = -1;
+   int     side = 0;
    double  number;
+   int     tmpInt;
    RE2     trackPattern(" *track ([0-9]+(?:\\.5)?)");
    RE2     fluxPattern(" *flux ([0-9]+(?:\\.[0-9]+)?)");
+   RE2     writeProtectPattern(" *write-protect ([01])");
+   RE2     sidesPattern(" *sides ([12])");
 
    while (getline(in, line))
    {
@@ -42,11 +46,25 @@ int txt2p64(string infile, string outfile)
          if (position == 0)
             position = 1;
 
-         P64PulseStreamAddPulse(&P64Image.PulseStreams[track], position, 0xffffffff);
+         P64PulseStreamAddPulse(&P64Image.PulseStreams[side][track], position, 0xffffffff);
       }
       else if (RE2::FullMatch(line, trackPattern, &number))
       {
          track = int(2 * number + 0.1);
+	 side = 0;
+	 if (track > 256)
+	 {
+	    side = 1;
+	    track -= 256;
+	 }
+      }
+      else if (RE2::FullMatch(line, writeProtectPattern, &tmpInt))
+      {
+         P64Image.WriteProtected = tmpInt;
+      }
+      else if (RE2::FullMatch(line, sidesPattern, &tmpInt))
+      {
+         P64Image.noSides = tmpInt;
       }
    }
 
@@ -101,15 +119,27 @@ int p642txt(string infile, string outfile)
          printf("Read ok!\n");
 
          ofstream out(outfile.c_str());
+	 
+	 if (P64Image.WriteProtected)
+	 {
+	    out << "write-protect 1\n";
+	 }
+	 if (P64Image.noSides == 2)
+	 {
+	    out << "sides 2\n";
+	 }
+	 
+	 int noSides = P64Image.noSides;
 
+         for (int side = 0; side < noSides; side++)
          for (int track = 2; track <= 85; track++)
          {
-            TP64PulseStream & instance = P64Image.PulseStreams[track];
+            TP64PulseStream & instance = P64Image.PulseStreams[side][track];
             int               current  = instance.UsedFirst;
 
             if (current >= 0)
             {
-               sprintf(buffer2, "track %i%s\n", track / 2, track & 1 ? ".5" : "");
+               sprintf(buffer2, "track %i%s\n", track / 2 + 128*side, track & 1 ? ".5" : "");
 
                out << buffer2;
             }

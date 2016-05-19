@@ -967,33 +967,37 @@ p64_uint32_t P64PulseStreamWriteToStream(PP64PulseStream Instance, PP64MemoryStr
 }
 
 void P64ImageCreate(PP64Image Instance) {
-	p64_int32_t HalfTrack;
+	p64_int32_t HalfTrack, side;
 	memset(Instance, 0, sizeof(TP64Image));
+	Instance->noSides = 1;
+	for(side=0; side<2; side++)
 	for(HalfTrack = 0; HalfTrack <= P64LastHalfTrack; HalfTrack++) {
-		P64PulseStreamCreate(&Instance->PulseStreams[HalfTrack]);
+		P64PulseStreamCreate(&Instance->PulseStreams[side][HalfTrack]);
 	}
 	P64ImageClear(Instance);
 }
 
 void P64ImageDestroy(PP64Image Instance) {
-	p64_int32_t HalfTrack;
+	p64_int32_t HalfTrack, side;
+	for(side=0; side<2; side++)
 	for(HalfTrack = 0; HalfTrack <= P64LastHalfTrack; HalfTrack++) {
-		P64PulseStreamDestroy(&Instance->PulseStreams[HalfTrack]);
+		P64PulseStreamDestroy(&Instance->PulseStreams[side][HalfTrack]);
 	}
 	memset(Instance, 0, sizeof(TP64Image));
 }
 
 void P64ImageClear(PP64Image Instance) {
-	p64_int32_t HalfTrack;
+	p64_int32_t HalfTrack, side;
 	Instance->WriteProtected = 0;
+	for(side=0; side<2; side++)
 	for(HalfTrack = 0; HalfTrack <= P64LastHalfTrack; HalfTrack++) {
-		P64PulseStreamClear(&Instance->PulseStreams[HalfTrack]);
+		P64PulseStreamClear(&Instance->PulseStreams[side][HalfTrack]);
 	}
 }
 
 p64_uint32_t P64ImageReadFromStream(PP64Image Instance, PP64MemoryStream Stream) {
 	TP64MemoryStream ChunksMemoryStream, ChunkMemoryStream;
-	p64_uint32_t Version, Flags, Size, Checksum, HalfTrack, OK;
+	p64_uint32_t Version, Flags, Size, Checksum, HalfTrack, OK, side;
 	TP64HeaderSignature HeaderSignature;
 	TP64ChunkSignature ChunkSignature;
 
@@ -1008,6 +1012,7 @@ p64_uint32_t P64ImageReadFromStream(PP64Image Instance, PP64MemoryStream Stream)
 							if(P64MemoryStreamReadDWord(Stream, &Size)) {
 								if(P64MemoryStreamReadDWord(Stream, &Checksum)) {
 									Instance->WriteProtected = (Flags & 1) != 0;
+									Instance->noSides = 1+!!(Flags & 2);
 									P64MemoryStreamCreate(&ChunksMemoryStream);
 									if(P64MemoryStreamAppendFromCount(&ChunksMemoryStream, Stream, Size) == Size) {
 										if(P64CRC32(ChunksMemoryStream.Data, Size) == Checksum) {
@@ -1031,9 +1036,10 @@ p64_uint32_t P64ImageReadFromStream(PP64Image Instance, PP64MemoryStream Stream)
 																	if(P64MemoryStreamAppendFromCount(&ChunkMemoryStream, &ChunksMemoryStream, Size) == Size) {
 																		if(P64MemoryStreamSeek(&ChunkMemoryStream, 0) == 0) {
 																			if(P64CRC32(ChunkMemoryStream.Data, Size) == Checksum) {
-																				if((ChunkSignature[0] == 'H') && (ChunkSignature[1] == 'T') && (ChunkSignature[2] == 'P') && ((ChunkSignature[3] >= P64FirstHalfTrack) && (ChunkSignature[3] <= P64LastHalfTrack))) {
-																					HalfTrack = ChunkSignature[3];
-																					OK = P64PulseStreamReadFromStream(&Instance->PulseStreams[HalfTrack], &ChunkMemoryStream);
+																				if((ChunkSignature[0] == 'H') && (ChunkSignature[1] == 'T') && (ChunkSignature[2] == 'P') && (((ChunkSignature[3] & 127) >= P64FirstHalfTrack) && ((ChunkSignature[3] & 127) <= P64LastHalfTrack))) {
+																					HalfTrack = ChunkSignature[3] & 127;
+																					side = !!(ChunkSignature[3] & 128);
+																					OK = P64PulseStreamReadFromStream(&Instance->PulseStreams[side][HalfTrack], &ChunkMemoryStream);
 																				} else {
 																					OK = 1;
 																				}
@@ -1066,7 +1072,7 @@ p64_uint32_t P64ImageReadFromStream(PP64Image Instance, PP64MemoryStream Stream)
 
 p64_uint32_t P64ImageWriteToStream(PP64Image Instance, PP64MemoryStream Stream) {
 	TP64MemoryStream MemoryStream, ChunksMemoryStream, ChunkMemoryStream;
-	p64_uint32_t Version, Flags, Size, Checksum, HalfTrack, result, WriteChunkResult;
+	p64_uint32_t Version, Flags, Size, Checksum, HalfTrack, result, WriteChunkResult, side;
 
 	TP64HeaderSignature HeaderSignature;
 	TP64ChunkSignature ChunkSignature;
@@ -1109,15 +1115,16 @@ p64_uint32_t P64ImageWriteToStream(PP64Image Instance, PP64MemoryStream Stream) 
 	P64MemoryStreamCreate(&ChunksMemoryStream);
 
 	result = 1;
+	for (side = 0; side < Instance->noSides; side++)
 	for(HalfTrack = P64FirstHalfTrack; HalfTrack <= P64LastHalfTrack; HalfTrack++) {
 
 		P64MemoryStreamCreate(&ChunkMemoryStream);
-		result = P64PulseStreamWriteToStream(&Instance->PulseStreams[HalfTrack], &ChunkMemoryStream);
+		result = P64PulseStreamWriteToStream(&Instance->PulseStreams[side][HalfTrack], &ChunkMemoryStream);
 		if(result) {
 			ChunkSignature[0] = 'H';
 			ChunkSignature[1] = 'T';
 			ChunkSignature[2] = 'P';
-			ChunkSignature[3] = HalfTrack;
+			ChunkSignature[3] = HalfTrack + 128*side;
 			WriteChunk();
 			result = WriteChunkResult;
 		}
@@ -1145,6 +1152,10 @@ p64_uint32_t P64ImageWriteToStream(PP64Image Instance, PP64MemoryStream Stream) 
 			Flags = 0;
 			if(Instance->WriteProtected) {
 				Flags |= 1;
+			}
+			if(Instance->noSides == 2)
+			{
+				Flags |= 2;
 			}
 
 			Size = ChunksMemoryStream.Size;
