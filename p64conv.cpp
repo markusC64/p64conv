@@ -180,9 +180,9 @@ int main(int argc, char ** argv)
    string in  = argv[1];
    string out = argv[2];
 
-   if (RE2::PartialMatch(in, "\\.p64") && RE2::PartialMatch(out, "\\.txt"))
+   if (RE2::PartialMatch(in, "\\.p64$") && RE2::PartialMatch(out, "\\.txt$"))
       p642txt(in, out);
-   else if (RE2::PartialMatch(in, "\\.txt") && RE2::PartialMatch(out, "\\.p64"))
+   else if (RE2::PartialMatch(in, "\\.txt$") && RE2::PartialMatch(out, "\\.p64$"))
       txt2p64(in, out);
    else
       cout << "Unknown conversion\n";
