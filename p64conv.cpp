@@ -52,10 +52,10 @@ int txt2p64(string infile, string outfile)
       {
          track = int(2 * number + 0.1);
 	 side = 0;
-	 if (track > 256)
+	 if (track > 128)
 	 {
 	    side = 1;
-	    track -= 256;
+	    track -= 128;
 	 }
       }
       else if (RE2::FullMatch(line, writeProtectPattern, &tmpInt))
