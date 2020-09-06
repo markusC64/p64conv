@@ -5,7 +5,7 @@ clean:
 	rm -f p64conv.o p64.o p64conv
 
 p64conv: p64conv.o p64.o
-	g++ -O3 -o p64conv p64conv.o p64.o -lre2
+	g++ -O3 -o p64conv p64conv.o p64.o -lre2 -lpthread
 	
 p64conv.o: p64conv.cpp
 	g++ -O3 -Ilib/p64refimp -c p64conv.cpp
