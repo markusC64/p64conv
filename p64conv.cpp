@@ -46,17 +46,19 @@ int txt2p64(string infile, string outfile)
          if (position == 0)
             position = 1;
 
-         P64PulseStreamAddPulse(&P64Image.PulseStreams[side][track], position, 0xffffffff);
+// printf( "Add pulse %i.%i\n", track, side);
+//         P64PulseStreamAddPulse(&P64Image.PulseStreams[side][track], position, 0xffffffff);
       }
       else if (RE2::FullMatch(line, trackPattern, &number))
       {
-         track = int(2 * number + 0.1);
+         
 	 side = 0;
-	 if (track > 128)
+	 if (number > 128)
 	 {
 	    side = 1;
-	    track -= 128;
+	    number -= 128;
 	 }
+   track = int(2 * number + 0.1);
       }
       else if (RE2::FullMatch(line, writeProtectPattern, &tmpInt))
       {
@@ -136,7 +138,6 @@ int p642txt(string infile, string outfile)
          {
             TP64PulseStream & instance = P64Image.PulseStreams[side][track];
             int               current  = instance.UsedFirst;
-
             if (current >= 0)
             {
                sprintf(buffer2, "track %i%s\n", track / 2 + 128*side, track & 1 ? ".5" : "");
