@@ -47,7 +47,7 @@ int txt2p64(string infile, string outfile)
             position = 1;
 
 // printf( "Add pulse %i.%i\n", track, side);
-//         P64PulseStreamAddPulse(&P64Image.PulseStreams[side][track], position, 0xffffffff);
+         P64PulseStreamAddPulse(&P64Image.PulseStreams[side][track], position, 0xffffffff);
       }
       else if (RE2::FullMatch(line, trackPattern, &number))
       {
